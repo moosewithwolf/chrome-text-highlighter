@@ -9,13 +9,13 @@
 Chrome Text Highlighter is a Chrome extension that lets you highlight selected text and store the highlight locally so it can be restored when you revisit the page.
 
 
-## Goal / 목표
+## Goal 
 
 - Easily highlight text on webpages.
 - Save highlights per page using the page’s URL.
 - Automatically restore highlights on page load.
 
-## Features / 기능
+## Features 
 
 - **Text Selection & Highlighting: **Use Option+3 to wrap selected text in a `<span>` with a yellow background.
 - **Local Storage: **Saves the parent container's HTML snapshot along with a unique XPath.

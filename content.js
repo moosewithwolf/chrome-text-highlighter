@@ -1,110 +1,145 @@
-// 현재 페이지에 대한 저장 키 생성 (예: pathname)
+// Create a key to save for the current page (like using the page path)
 function getStorageKey() {
-    // 필요에 따라 location.href나 pathname을 사용할 수 있습니다.
-    return location.pathname; 
+  return location.pathname;
+}
+
+// Function to create XPath: if it's a text node, base it on the parent
+function getXPath(node) {
+  if (node.nodeType === Node.TEXT_NODE) {
+    return getXPath(node.parentNode) + '/text()';
   }
-  
-  // XPath 생성 함수: 텍스트 노드인 경우 부모 기준으로 생성
-  function getXPath(node) {
-    if (node.nodeType === Node.TEXT_NODE) {
-      return getXPath(node.parentNode) + '/text()';
-    }
-    let path = "";
-    for (; node && node.nodeType === Node.ELEMENT_NODE; node = node.parentNode) {
-      let index = 1;
-      let sibling = node.previousSibling;
-      while (sibling) {
-        if (sibling.nodeType === Node.ELEMENT_NODE && sibling.nodeName === node.nodeName) {
-          index++;
-        }
-        sibling = sibling.previousSibling;
+  let path = "";
+  for (; node && node.nodeType === Node.ELEMENT_NODE; node = node.parentNode) {
+    let index = 1;
+    let sibling = node.previousSibling;
+    while (sibling) {
+      if (sibling.nodeType === Node.ELEMENT_NODE && sibling.nodeName === node.nodeName) {
+        index++;
       }
-      path = "/" + node.nodeName.toLowerCase() + "[" + index + "]" + path;
+      sibling = sibling.previousSibling;
     }
-    return path;
+    path = "/" + node.nodeName.toLowerCase() + "[" + index + "]" + path;
   }
-  
-  // XPath로 노드를 찾는 함수
-  function getNodeByXPath(path) {
-    const result = document.evaluate(path, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
-    return result.singleNodeValue;
-  }
-  
-  // 하이라이트 적용 및 저장 함수 (부모 container의 HTML을 저장)
-  function highlightSelection() {
-    const selection = window.getSelection();
-    if (selection && selection.toString().trim().length > 0) {
-      const range = selection.getRangeAt(0);
-      if (!range.collapsed) {
-        const span = document.createElement("span");
-        span.style.backgroundColor = "yellow"; // 형광펜 효과
-  
-        try {
-          // 선택 영역을 span으로 감싸서 하이라이트 적용
-          range.surroundContents(span);
-          console.log("하이라이트 적용됨:", span.outerHTML);
-  
-          // 강조된 영역의 부모 container 선택 (필요에 따라 특정 클래스를 기준으로 선택 가능)
-          let container = span.parentNode;
-          const containerXPath = getXPath(container);
-          console.log("저장할 container XPath:", containerXPath);
-  
-          // 저장 데이터 구조: { containerHighlights: { [containerXPath]: outerHTML }, pageKey: location.pathname }
-          chrome.storage.local.get(getStorageKey(), (data) => {
-            let storedData = data[getStorageKey()] || {};
-            let containerHighlights = storedData.containerHighlights || {};
-            containerHighlights[containerXPath] = container.outerHTML;
-            storedData.containerHighlights = containerHighlights;
-            chrome.storage.local.set({ [getStorageKey()]: storedData }, () => {
-              console.log("Container highlight saved for:", containerXPath);
-            });
+  return path;
+}
+
+// Function to find a node using XPath
+function getNodeByXPath(path) {
+  const result = document.evaluate(path, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+  return result.singleNodeValue;
+}
+
+// Function to apply highlight and save it (saves the parent's HTML)
+function highlightSelection() {
+  const selection = window.getSelection();
+  if (selection && selection.toString().trim().length > 0) {
+    const range = selection.getRangeAt(0);
+    if (!range.collapsed) {
+      const span = document.createElement("span");
+      span.style.backgroundColor = "yellow"; // Highlighter effect
+      span.classList.add("chrome-text-highlighter-highlight"); // Add a class to identify for removal
+
+      try {
+        // Wrap the selected text with <span> to apply highlight
+        range.surroundContents(span);
+        console.log("Highlight applied:", span.outerHTML);
+
+        // Choose the parent of the highlighted part
+        let container = span.parentNode;
+        const containerXPath = getXPath(container);
+        console.log("XPath to save for container:", containerXPath);
+
+        // Save structure: { containerHighlights: { [containerXPath]: outerHTML } }
+        chrome.storage.local.get(getStorageKey(), (data) => {
+          let storedData = data[getStorageKey()] || {};
+          let containerHighlights = storedData.containerHighlights || {};
+          containerHighlights[containerXPath] = container.outerHTML;
+          storedData.containerHighlights = containerHighlights;
+          chrome.storage.local.set({ [getStorageKey()]: storedData }, () => {
+            console.log("Saved highlight for container:", containerXPath);
           });
-        } catch (error) {
-          console.error("하이라이트 적용 중 에러 발생:", error);
-        }
+        });
+      } catch (error) {
+        console.error("Error while applying highlight:", error);
       }
     }
   }
-  
-  // Option(Alt) + 3 단축키 이벤트 리스너 (macOS의 Option은 altKey로 인식)
-  document.addEventListener("keydown", (event) => {
-    if (event.altKey && event.key === "3") {
-      event.preventDefault();
-      console.log("Option+3 단축키 감지됨");
-      highlightSelection();
+}
+
+// Shortcut key listener for Option(Alt) + 3 (uses capturing)
+document.addEventListener("keydown", (event) => {
+  if (event.altKey && event.key === "3") {
+    event.preventDefault();
+    console.log("Option+3 shortcut detected");
+    highlightSelection();
+  }
+}, true);
+
+// Function to remove highlights: keeps removing all highlight spans in the document
+function removeHighlights() {
+  let highlightSpans = document.querySelectorAll("span.chrome-text-highlighter-highlight");
+  // Remove repeatedly: keep removing until there are no more highlight spans
+  while (highlightSpans.length > 0) {
+    highlightSpans.forEach((span) => {
+      const parent = span.parentNode;
+      while (span.firstChild) {
+        parent.insertBefore(span.firstChild, span);
+      }
+      parent.removeChild(span);
+    });
+    highlightSpans = document.querySelectorAll("span.chrome-text-highlighter-highlight");
+  }
+  // Delete saved highlight data for this page
+  chrome.storage.local.remove(getStorageKey(), () => {
+    console.log("Saved highlight data removed:", getStorageKey());
+  });
+  console.log("All highlights removed");
+}
+
+// Shortcut key listener for Option(Alt) + 4 (uses capturing)
+document.addEventListener("keydown", (event) => {
+  if (event.altKey && event.key === "4") {
+    event.preventDefault();
+    console.log("Option+4 shortcut detected");
+    removeHighlights();
+  }
+}, true);
+
+// Function to restore saved container HTML with highlights
+function restoreContainerHighlights() {
+  chrome.storage.local.get(getStorageKey(), (data) => {
+    let storedData = data[getStorageKey()];
+    if (storedData && storedData.containerHighlights) {
+      let containerHighlights = storedData.containerHighlights;
+      for (let containerXPath in containerHighlights) {
+        let newHTML = containerHighlights[containerXPath];
+        let containerEl = getNodeByXPath(containerXPath);
+        if (containerEl) {
+          containerEl.outerHTML = newHTML;
+          console.log("Restored:", containerXPath);
+        } else {
+          console.warn("Could not find container by XPath:", containerXPath);
+        }
+      }
     }
   });
-  
-  // 저장된 container HTML을 복원하는 함수
-  function restoreContainerHighlights() {
-    chrome.storage.local.get(getStorageKey(), (data) => {
-      let storedData = data[getStorageKey()];
-      if (storedData && storedData.containerHighlights) {
-        let containerHighlights = storedData.containerHighlights;
-        for (let containerXPath in containerHighlights) {
-          let newHTML = containerHighlights[containerXPath];
-          let containerEl = getNodeByXPath(containerXPath);
-          if (containerEl) {
-            containerEl.outerHTML = newHTML;
-            console.log("복원됨:", containerXPath);
-          } else {
-            console.warn("XPath로 container를 찾지 못함:", containerXPath);
-          }
-        }
-      }
+}
+
+// Run restore function after the DOM is ready (adds a small delay)
+function initRestore() {
+  if (document.readyState === "complete" || document.readyState === "interactive") {
+    setTimeout(() => {
+      console.log("Extension is ready");
+      restoreContainerHighlights();
+    }, 10);
+  } else {
+    document.addEventListener("DOMContentLoaded", () => {
+      setTimeout(() => {
+        console.log("Extension is ready");
+        restoreContainerHighlights();
+      }, 10);
     });
   }
-  
-  // DOM이 준비된 후 복원 로직 실행 (약간의 지연 추가)
-  function initRestore() {
-    if (document.readyState === "complete" || document.readyState === "interactive") {
-      setTimeout(restoreContainerHighlights, 50);
-    } else {
-      document.addEventListener("DOMContentLoaded", () => {
-        setTimeout(restoreContainerHighlights, 50);
-      });
-    }
-  }
-  
-  initRestore();
-  
+}
+
+initRestore();

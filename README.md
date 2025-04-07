@@ -1,6 +1,9 @@
 
 # Chrome Text Highlighter
 
+![ScreenRecording2025-04-07at1 34 46PM2-ezgif com-speed](https://github.com/user-attachments/assets/62bb4630-5601-4bea-875e-2d5bb709b5a6)
+
+
 ## Overview / 개요
 
 Chrome Text Highlighter is a Chrome extension that lets you highlight selected text and store the highlight locally so it can be restored when you revisit the page.

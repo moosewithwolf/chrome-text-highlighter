@@ -1,0 +1,14 @@
+{
+    "manifest_version": 3,
+    "name": "Chrome Text Highlighter",
+    "version": "1.0",
+    "description": "Highlight text using Option+3 and store container DOM snapshots to restore highlights.",
+    "permissions": ["storage"],
+    "content_scripts": [
+      {
+        "matches": ["<all_urls>"],
+        "js": ["content.js"]
+      }
+    ]
+  }
+  

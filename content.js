@@ -29,39 +29,37 @@ function getNodeByXPath(path) {
   return result.singleNodeValue;
 }
 
-// Function to apply highlight and save it (saves the parent's HTML)
+// Function to apply highlight and save it (supports complex DOM selection)
 function highlightSelection() {
   const selection = window.getSelection();
-  if (selection && selection.toString().trim().length > 0) {
+  if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
     const range = selection.getRangeAt(0);
-    if (!range.collapsed) {
-      const span = document.createElement("span");
-      span.style.backgroundColor = "yellow"; // Highlighter effect
-      span.classList.add("chrome-text-highlighter-highlight"); // Add a class to identify for removal
+    const span = document.createElement("span");
+    span.style.backgroundColor = "yellow";
+    span.classList.add("chrome-text-highlighter-highlight");
 
-      try {
-        // Wrap the selected text with <span> to apply highlight
-        range.surroundContents(span);
-        console.log("Highlight applied:", span.outerHTML);
+    try {
+      const content = range.extractContents(); // Take out selected content
+      span.appendChild(content);              // Wrap with span
+      range.insertNode(span);                 // Insert back
 
-        // Choose the parent of the highlighted part
-        let container = span.parentNode;
-        const containerXPath = getXPath(container);
-        console.log("XPath to save for container:", containerXPath);
+      // Save the parent container's HTML
+      let container = span.parentNode;
+      const containerXPath = getXPath(container);
 
-        // Save structure: { containerHighlights: { [containerXPath]: outerHTML } }
-        chrome.storage.local.get(getStorageKey(), (data) => {
-          let storedData = data[getStorageKey()] || {};
-          let containerHighlights = storedData.containerHighlights || {};
-          containerHighlights[containerXPath] = container.outerHTML;
-          storedData.containerHighlights = containerHighlights;
-          chrome.storage.local.set({ [getStorageKey()]: storedData }, () => {
-            console.log("Saved highlight for container:", containerXPath);
-          });
+      chrome.storage.local.get(getStorageKey(), (data) => {
+        let storedData = data[getStorageKey()] || {};
+        let containerHighlights = storedData.containerHighlights || {};
+        containerHighlights[containerXPath] = container.outerHTML;
+        storedData.containerHighlights = containerHighlights;
+        chrome.storage.local.set({ [getStorageKey()]: storedData }, () => {
+          console.log("Saved highlight for container:", containerXPath);
         });
-      } catch (error) {
-        console.error("Error while applying highlight:", error);
-      }
+      });
+
+      console.log("Highlight applied (safe):", span.outerHTML);
+    } catch (error) {
+      console.error("Error while applying highlight:", error);
     }
   }
 }
@@ -75,26 +73,69 @@ document.addEventListener("keydown", (event) => {
   }
 }, true);
 
-// Function to remove highlights: keeps removing all highlight spans in the document
+// Function to remove highlights: only those overlapping with selection
 function removeHighlights() {
-  let highlightSpans = document.querySelectorAll("span.chrome-text-highlighter-highlight");
-  // Remove repeatedly: keep removing until there are no more highlight spans
-  while (highlightSpans.length > 0) {
+  const selection = window.getSelection();
+  const hasSelection = selection && selection.rangeCount > 0 && !selection.isCollapsed;
+
+  if (hasSelection) {
+    const range = selection.getRangeAt(0);
+    const container = range.commonAncestorContainer;
+    const root = container.nodeType === Node.ELEMENT_NODE ? container : container.parentNode;
+
+    const highlightSpans = root.querySelectorAll("span.chrome-text-highlighter-highlight");
+
+    const touchedContainers = new Set();
+
     highlightSpans.forEach((span) => {
-      const parent = span.parentNode;
-      while (span.firstChild) {
-        parent.insertBefore(span.firstChild, span);
+      if (range.intersectsNode(span)) {
+        const parent = span.parentNode;
+        touchedContainers.add(parent);
+        while (span.firstChild) {
+          parent.insertBefore(span.firstChild, span);
+        }
+        parent.removeChild(span);
       }
-      parent.removeChild(span);
     });
-    highlightSpans = document.querySelectorAll("span.chrome-text-highlighter-highlight");
+
+    // delete XPath from storage
+    chrome.storage.local.get(getStorageKey(), (data) => {
+      let storedData = data[getStorageKey()];
+      if (!storedData || !storedData.containerHighlights) return;
+
+      touchedContainers.forEach((container) => {
+        const xpath = getXPath(container);
+        delete storedData.containerHighlights[xpath];
+      });
+
+      chrome.storage.local.set({ [getStorageKey()]: storedData }, () => {
+        console.log("Updated storage after partial highlight removal");
+      });
+    });
+
+    console.log("Removed only intersecting highlights");
+  } else {
+    // 전체 삭제
+    let highlightSpans = document.querySelectorAll("span.chrome-text-highlighter-highlight");
+    while (highlightSpans.length > 0) {
+      highlightSpans.forEach((span) => {
+        const parent = span.parentNode;
+        while (span.firstChild) {
+          parent.insertBefore(span.firstChild, span);
+        }
+        parent.removeChild(span);
+      });
+      highlightSpans = document.querySelectorAll("span.chrome-text-highlighter-highlight");
+    }
+
+    chrome.storage.local.remove(getStorageKey(), () => {
+      console.log("Saved highlight data removed:", getStorageKey());
+    });
+
+    console.log("All highlights removed");
   }
-  // Delete saved highlight data for this page
-  chrome.storage.local.remove(getStorageKey(), () => {
-    console.log("Saved highlight data removed:", getStorageKey());
-  });
-  console.log("All highlights removed");
 }
+
 
 // Shortcut key listener for Option(Alt) + 4 (uses capturing)
 document.addEventListener("keydown", (event) => {

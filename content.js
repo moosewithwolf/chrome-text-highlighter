@@ -64,11 +64,12 @@ function highlightSelection() {
   }
 }
 
-// Shortcut key listener for Option(Alt) + 3 (uses capturing)
+// Shortcut key listener for Option(Alt) + 3 using event.code
 document.addEventListener("keydown", (event) => {
-  if (event.altKey && event.key === "3") {
+  // event.code always returns a value like 'Digit3', which helps avoid issues with special characters on Mac.
+  if (event.altKey && event.code === "Digit3") {
     event.preventDefault();
-    console.log("Option+3 shortcut detected");
+    console.log("Alt+Digit3 shortcut detected (Option+3)");
     highlightSelection();
   }
 }, true);
@@ -137,11 +138,11 @@ function removeHighlights() {
 }
 
 
-// Shortcut key listener for Option(Alt) + 4 (uses capturing)
+// Shortcut key listener for Option(Alt) + 4 using event.code
 document.addEventListener("keydown", (event) => {
-  if (event.altKey && event.key === "4") {
+  if (event.altKey && event.code === "Digit4") {
     event.preventDefault();
-    console.log("Option+4 shortcut detected");
+    console.log("Alt+Digit4 shortcut detected (Option+4)");
     removeHighlights();
   }
 }, true);

@@ -66,8 +66,8 @@ function highlightSelection() {
 
 // Shortcut key listener for Option(Alt) + 3 using event.code
 document.addEventListener("keydown", (event) => {
-  // event.code always returns a value like 'Digit3', which helps avoid issues with special characters on Mac.
-  if (event.altKey && event.code === "Digit3") {
+// event.code always returns a value like 'Digit3', which helps avoid issues with special characters on Mac.
+if (event.altKey && event.code === "Digit3") {
     event.preventDefault();
     console.log("Alt+Digit3 shortcut detected (Option+3)");
     highlightSelection();
@@ -116,7 +116,6 @@ function removeHighlights() {
 
     console.log("Removed only intersecting highlights");
   } else {
-    // 전체 삭제
     let highlightSpans = document.querySelectorAll("span.chrome-text-highlighter-highlight");
     while (highlightSpans.length > 0) {
       highlightSpans.forEach((span) => {
@@ -136,7 +135,6 @@ function removeHighlights() {
     console.log("All highlights removed");
   }
 }
-
 
 // Shortcut key listener for Option(Alt) + 4 using event.code
 document.addEventListener("keydown", (event) => {
